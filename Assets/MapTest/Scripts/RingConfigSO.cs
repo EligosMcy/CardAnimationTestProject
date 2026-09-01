@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Tools.UI.Ring
+namespace MapTest
 {
     /// <summary>
     /// 圆环布局配置文件，保存半径、数量、部件尺寸等参数。
