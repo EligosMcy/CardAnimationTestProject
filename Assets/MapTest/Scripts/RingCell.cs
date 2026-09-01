@@ -5,9 +5,9 @@ using UnityEngine.UI;
 namespace MapTest
 {
     /// <summary>
-    /// 环形地图 cell 组件：挂载于 MapCell 预制体根节点。
-    /// 需 Button（点击上报）、Image（渲染双态贴图）、cellSize 与 direction（ApplySizeAndDirection 应用）；
-    /// layerIndex/cellIndex 由生成时回填，供事件上报使用。cell 只"喊"不持上游引用。
+    /// 环形地图 cell 组件：挂载于 RingCell 预制体根节点。
+    /// 仅保留层/序号身份、双态贴图切换与可点击态控制，几何（位置/尺寸/旋转）由 RingLayer 经 UiRingLayout 外部设置，
+    /// cell 自身不存储任何几何数据。layerIndex/cellIndex 由生成时回填，供事件上报使用。cell 只"喊"不持上游引用。
     /// </summary>
     [RequireComponent(typeof(Button))]
     public class RingCell : MonoBehaviour
@@ -35,16 +35,6 @@ namespace MapTest
         [SerializeField] private Sprite _disableSprite;
 
         /// <summary>
-        /// cell 尺寸（正方形边长，应用 sizeDelta）。
-        /// </summary>
-        [SerializeField] private float _cellSize = 100f;
-
-        /// <summary>
-        /// 方向（1=顺时针，-1=逆时针），由生成时注入。
-        /// </summary>
-        [SerializeField] private int _direction = 1;
-
-        /// <summary>
         /// 所属层 index，生成时回填。
         /// </summary>
         [SerializeField] private int _layerIndex;
@@ -57,7 +47,7 @@ namespace MapTest
         // ==================== Unity 生命周期 ====================
 
         /// <summary>
-        /// 缓存 Button 并挂接点击回调。
+        /// 缓存 Button、挂接点击回调，并将贴图与可点击态初始化为禁用态。
         /// </summary>
         private void Awake()
         {
@@ -70,31 +60,28 @@ namespace MapTest
             {
                 XLogger.LogError("RingCell", "Awake: 缺少 Button 组件");
             }
+            SetEnable(false);
         }
 
         // ==================== 公开方法 ====================
 
         /// <summary>
-        /// 切换双态贴图：active 时显示 Enable 贴图，否则显示 Disable 贴图。
+        /// 切换激活态：active 时显示 Enable 贴图且 Button 可点击，否则显示 Disable 贴图且不可点击。
         /// </summary>
         public void SetEnable(bool active)
         {
+            if (_button == null)
+            {
+                XLogger.LogError("RingCell", "SetEnable: _button 为空，请检查预制体引用");
+                return;
+            }
             if (_image == null)
             {
                 XLogger.LogError("RingCell", "SetEnable: _image 为空，请检查预制体引用");
                 return;
             }
+            _button.interactable = active;
             _image.sprite = active ? _enableSprite : _disableSprite;
-        }
-
-        /// <summary>
-        /// 应用尺寸与方向：将 sizeDelta 设为 (cellSize, cellSize)，localEulerAngles 保持竖直（0,0,0）。
-        /// </summary>
-        public void ApplySizeAndDirection()
-        {
-            RectTransform rect = (RectTransform)transform;
-            rect.sizeDelta = new Vector2(_cellSize, _cellSize);
-            rect.localEulerAngles = new Vector3(0f, 0f, 0f);
         }
 
         /// <summary>
@@ -107,12 +94,6 @@ namespace MapTest
         }
 
         // ==================== 属性 ====================
-
-        /// <summary>cell 尺寸（正方形边长）。</summary>
-        public float CellSize { get => _cellSize; set => _cellSize = value; }
-
-        /// <summary>方向（1 顺时针 / -1 逆时针）。</summary>
-        public int Direction { get => _direction; set => _direction = value; }
 
         /// <summary>所属层 index。</summary>
         public int LayerIndex => _layerIndex;

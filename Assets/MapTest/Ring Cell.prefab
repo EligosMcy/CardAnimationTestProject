@@ -55,8 +55,6 @@ MonoBehaviour:
   _image: {fileID: 7457974283301626886}
   _enableSprite: {fileID: 21300000, guid: d6afe9de2de84474890417585baa2aeb, type: 3}
   _disableSprite: {fileID: 21300000, guid: 9b81ca7147187ed4a84134920be56891, type: 3}
-  _cellSize: 300
-  _direction: 1
   _layerIndex: 0
   _cellIndex: 0
 --- !u!114 &7457974283301626886
@@ -114,7 +112,7 @@ MonoBehaviour:
     m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
     m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
     m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
-    m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+    m_DisabledColor: {r: 1, g: 1, b: 1, a: 1}
     m_ColorMultiplier: 1
     m_FadeDuration: 0.1
   m_SpriteState:

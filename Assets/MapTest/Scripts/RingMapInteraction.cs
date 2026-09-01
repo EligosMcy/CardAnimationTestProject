@@ -1,32 +1,31 @@
-using System.Collections;
-using System.Collections.Generic;
+using System;
+using ShowX.Utils;
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 namespace MapTest
 {
     /// <summary>
-    /// 环形地图交互控制（InputActionAsset，全部短按）：左键短按进入下一层、右键短按退回上一层（两端无效，可回退），
-    /// 滚轮在 [activeLayerIndex, 末层] 内浏览预览（不改激活层）；左键命中 cell Button 时不切换（仅 cell 点击上报）。
-    /// 提交/浏览期间按 progressScaleCurve 对整图根节点 scale 做 Tween，并更新两个 TextMeshProUGUI 指示（方向/状态）。
+    /// 环形地图交互控制（InputActionProperty，长按触发）：按住键盘 ↑ 长满阈值进入下一层、按住 ↓ 长满阈值退回上一层
+    /// （两端无效，可回退；松手早于阈值不切换），长按期间 <see cref="_pressProgressImage"/> 的 fillAmount 实时显示进度 0→1；
+    /// 滚轮缩放整图（offset 前进 = 全体层等比放大一级，后退 = 缩小，上下限由配置钳制）。
+    /// 层切换输入通过两个 InputActionProperty 配置（默认内联绑定 ↑/↓），便于在 Inspector 中改绑其他按键；
+    /// 更新两个 TextMeshProUGUI 指示（方向/缩放状态）。
     /// </summary>
     public class RingMapInteraction : MonoBehaviour
     {
         // ==================== 常量 ====================
 
-        /// <summary>根节点缩放 Tween 时长（秒）。</summary>
-        private const float SCALE_TWEEN_DURATION = 0.25f;
-
-        /// <summary>滚轮浏览缩放 Tween 强度。</summary>
-        private const float SCROLL_SCALE_INTENSITY = 0.35f;
-
-        /// <summary>提交缩放 Tween 强度。</summary>
-        private const float SUBMIT_SCALE_INTENSITY = 1f;
-
         /// <summary>忽略滚轮值的阈值。</summary>
         private const float SCROLL_IGNORE_THRESHOLD = 0.01f;
+
+        /// <summary>缩放百分比换算基数。</summary>
+        private const float PERCENT_MULTIPLIER = 100f;
+
+        /// <summary>长按阈值下限（防止误配为 0 导致除零/立即触发）。</summary>
+        private const float MIN_LONG_PRESS_DURATION = 0.01f;
 
         // ==================== 字段 ====================
 
@@ -42,53 +41,74 @@ namespace MapTest
         [SerializeField] private TextMeshProUGUI _directionText;
 
         /// <summary>
-        /// 状态指示 TextMeshPro（显示激活层数与当前显示层数）。
+        /// 状态指示 TextMeshPro（显示激活层数与 0 层当前缩放百分比）。
         /// </summary>
         [SerializeField] private TextMeshProUGUI _statusText;
 
         /// <summary>
-        /// 整图根节点缩放曲线（提交/浏览时 Tween），默认从配置读取。
+        /// 进入下一层输入动作（按住长满阈值后切一层；默认内联绑定键盘 ↑，可在 Inspector 改绑其他按键）。
+        /// </summary>
+        [Header("层切换输入")]
+        [SerializeField] private InputActionProperty _nextLayerAction = new InputActionProperty(new InputAction("NextLayer", InputActionType.Button, "<Keyboard>/upArrow"));
+
+        /// <summary>
+        /// 退回上一层输入动作（按住长满阈值后切一层；默认内联绑定键盘 ↓，可在 Inspector 改绑其他按键）。
+        /// </summary>
+        [SerializeField] private InputActionProperty _previousLayerAction = new InputActionProperty(new InputAction("PreviousLayer", InputActionType.Button, "<Keyboard>/downArrow"));
+
+        /// <summary>
+        /// 长按进度 Image（Image.Type 需为 Filled，fillAmount 随长按进度 0→1 变化，松手清零）。
+        /// </summary>
+        [Header("长按进度")]
+        [SerializeField] private Image _pressProgressImage;
+
+        /// <summary>
+        /// 长按触发阈值（秒）：按住 ↑/↓ 达到该时长后执行一次层切换。
+        /// </summary>
+        [SerializeField] private float _longPressDuration = 0.5f;
+
+        /// <summary>
+        /// 整图根节点缩放曲线（已停用：根节点缩放 Tween 已移除，保留字段兼容旧序列化数据）。
         /// </summary>
         [Header("交互参数（默认从配置读取）")]
         [SerializeField] private AnimationCurve _progressScaleCurve;
 
         /// <summary>
-        /// 滚轮浏览速度：每次滚轮拨动改变浏览焦点 t 的幅度（层）。
+        /// 滚轮缩放步长：每次滚轮拨动推进 offset 的幅度（层，运行期从配置 WheelStep / TicksPerLevel 计算覆盖，
+        /// 默认 1/5 = 0.2，滚满 5 格推进一整层）。
         /// </summary>
         [SerializeField] private float _scrollSpeed = 0.5f;
 
         // ==================== 运行时状态 ====================
 
-        /// <summary>输入控制包装类（RingMapControls.inputactions 生成）。</summary>
+        /// <summary>输入控制包装类（RingMapControls.inputactions 生成，仅用于滚轮缩放）。</summary>
         private RingMapControls _controls;
-
-        /// <summary>根节点缩放 Tween 协程引用。</summary>
-        private Coroutine _scaleTween;
-
-        /// <summary>整图根节点 Transform（Tween 目标）。</summary>
-        private Transform _rootTransform;
 
         /// <summary>最近一次层移动是否向下（true=向下进入深层，false=向上退回表层）。</summary>
         private bool _lastMoveDown = true;
 
+        /// <summary>是否正在长按中（按住 ↑ 或 ↓ 未松开）。</summary>
+        private bool _isPressing;
+
+        /// <summary>当前长按方向（1=进入下一层，-1=退回上一层），仅在 _isPressing 时有效。</summary>
+        private int _pressDir;
+
+        /// <summary>长按起始时间（Time.unscaledTime，不受时间缩放影响）。</summary>
+        private float _pressStartTime;
+
+        /// <summary>当前长按是否已执行层切换（达到阈值后置 true，防止重复触发）。</summary>
+        private bool _pressExecuted;
+
         // ==================== Unity 生命周期 ====================
 
         /// <summary>
-        /// 缓存根节点 Transform。
-        /// </summary>
-        private void Awake()
-        {
-            _rootTransform = _generator != null ? _generator.transform : transform;
-        }
-
-        /// <summary>
-        /// 创建并启用输入动作，订阅 performed 回调与生成器推进事件。
+        /// 订阅两个层切换 InputActionProperty 的按下/松开事件并启用动作，创建滚轮输入并订阅生成器推进事件。
         /// </summary>
         private void OnEnable()
         {
+            bindAction(_nextLayerAction, onNextLayerPressed, onNextLayerReleased);
+            bindAction(_previousLayerAction, onPreviousLayerPressed, onPreviousLayerReleased);
             _controls = new RingMapControls();
-            _controls.Map.LeftClick.performed += onLeftClick;
-            _controls.Map.RightClick.performed += onRightClick;
             _controls.Map.Wheel.performed += onWheel;
             _controls.Map.Enable();
             if (_generator != null)
@@ -107,68 +127,99 @@ namespace MapTest
         }
 
         /// <summary>
-        /// 每帧刷新状态指示（显示层数 round(t) 随浏览实时变化）。
+        /// 每帧推进长按计时与进度显示，并刷新状态指示（缩放百分比随 offset 实时变化）。
         /// </summary>
         private void Update()
         {
+            tickLongPress();
             updateHud();
         }
 
         /// <summary>
-        /// 取消订阅、禁用输入并停止 Tween，避免残留状态。
+        /// 取消订阅并禁用输入，避免残留状态。
         /// </summary>
         private void OnDisable()
         {
+            unbindAction(_nextLayerAction, onNextLayerPressed, onNextLayerReleased);
+            unbindAction(_previousLayerAction, onPreviousLayerPressed, onPreviousLayerReleased);
             if (_generator != null)
             {
                 _generator.LayerAdvanced -= onLayerAdvanced;
             }
             if (_controls != null)
             {
-                _controls.Map.LeftClick.performed -= onLeftClick;
-                _controls.Map.RightClick.performed -= onRightClick;
                 _controls.Map.Wheel.performed -= onWheel;
                 _controls.Map.Disable();
                 _controls.Dispose();
                 _controls = null;
-            }
-            if (_scaleTween != null)
-            {
-                StopCoroutine(_scaleTween);
-                _scaleTween = null;
             }
         }
 
         // ==================== 输入处理 ====================
 
         /// <summary>
-        /// 左键短按：若指针落在 cell Button 上则忽略（仅 cell 点击上报），否则进入下一层。
+        /// ↑ 键按下：开始长按计时（长满阈值后进入下一层）。
         /// </summary>
-        private void onLeftClick(InputAction.CallbackContext context)
+        private void onNextLayerPressed(InputAction.CallbackContext context)
         {
-            if (isPointerOverCell())
+            beginPress(1);
+        }
+
+        /// <summary>
+        /// ↓ 键按下：开始长按计时（长满阈值后退回上一层）。
+        /// </summary>
+        private void onPreviousLayerPressed(InputAction.CallbackContext context)
+        {
+            beginPress(-1);
+        }
+
+        /// <summary>
+        /// ↑ 键松开：结束长按（未满阈值则不切换）。
+        /// </summary>
+        private void onNextLayerReleased(InputAction.CallbackContext context)
+        {
+            endPress(1);
+        }
+
+        /// <summary>
+        /// ↓ 键松开：结束长按（未满阈值则不切换）。
+        /// </summary>
+        private void onPreviousLayerReleased(InputAction.CallbackContext context)
+        {
+            endPress(-1);
+        }
+
+        /// <summary>
+        /// 记录一次长按开始：同一时间只允许一个方向的长按，已在按则忽略。
+        /// </summary>
+        private void beginPress(int dir)
+        {
+            if (_isPressing)
             {
                 return;
             }
-            if (_generator != null)
-            {
-                _generator.AdvanceLayer(1);
-            }
+            _isPressing = true;
+            _pressDir = dir;
+            _pressStartTime = Time.unscaledTime;
+            _pressExecuted = false;
         }
 
         /// <summary>
-        /// 右键短按：退回上一层（最上层无效由生成器内部处理）。
+        /// 结束指定方向的长按：与当前长按方向一致才清空（防止另一方向松手误清），未满阈值时此处不会切换。
         /// </summary>
-        private void onRightClick(InputAction.CallbackContext context)
+        private void endPress(int dir)
         {
-            if (_generator != null)
+            if (!_isPressing || _pressDir != dir)
             {
-                _generator.AdvanceLayer(-1);
+                return;
             }
+            _isPressing = false;
+            _pressExecuted = false;
+            setPressFill(0f);
         }
 
         /// <summary>
-        /// 滚轮浏览：前进（y&gt;0）向深层、后退（y&lt;0）向表层，改变 browseT 不改激活层；并更新方向指示与根 Tween。
+        /// 滚轮缩放：前进（y&gt;0）全体层等比放大一级、后退（y&lt;0）缩小；不改激活层，并更新方向指示与缩放状态。
         /// </summary>
         private void onWheel(InputAction.CallbackContext context)
         {
@@ -180,49 +231,60 @@ namespace MapTest
             _lastMoveDown = scroll.y > 0f;
             if (_generator != null)
             {
-                _generator.BrowseBy(Mathf.Sign(scroll.y) * _scrollSpeed);
+                _generator.ZoomBy(Mathf.Sign(scroll.y) * _scrollSpeed);
             }
-            playScaleTween(SCROLL_SCALE_INTENSITY);
             updateHud();
         }
 
         /// <summary>
-        /// 激活层推进回调：记录方向、触发提交 Tween 并刷新 HUD。
+        /// 激活层推进回调：记录方向并刷新 HUD。
         /// </summary>
         private void onLayerAdvanced(int dir)
         {
             _lastMoveDown = dir > 0;
-            playScaleTween(SUBMIT_SCALE_INTENSITY);
             updateHud();
         }
 
+        // ==================== 长按进度 ====================
+
         /// <summary>
-        /// 检测当前指针是否落在某个 cell Button 上（命中时左键仅触发 cell 点击，不切换层）。
+        /// 每帧长按计时：满阈值执行一次层切换并锁定，实时把进度写入进度 Image（未长按时清零）。
         /// </summary>
-        private bool isPointerOverCell()
+        private void tickLongPress()
         {
-            if (EventSystem.current == null)
+            if (!_isPressing)
             {
-                return false;
+                setPressFill(0f);
+                return;
             }
-            PointerEventData pointer = new PointerEventData(EventSystem.current);
-            pointer.position = Mouse.current.position.ReadValue();
-            List<RaycastResult> results = new List<RaycastResult>();
-            EventSystem.current.RaycastAll(pointer, results);
-            for (int i = 0; i < results.Count; i++)
+            float elapsed = Time.unscaledTime - _pressStartTime;
+            float duration = Mathf.Max(_longPressDuration, MIN_LONG_PRESS_DURATION);
+            if (!_pressExecuted && elapsed >= duration)
             {
-                if (results[i].gameObject != null && results[i].gameObject.GetComponentInParent<RingCell>() != null)
+                _pressExecuted = true;
+                if (_generator != null)
                 {
-                    return true;
+                    _generator.AdvanceLayer(_pressDir);
                 }
             }
-            return false;
+            setPressFill(Mathf.Clamp01(elapsed / duration));
+        }
+
+        /// <summary>
+        /// 设置长按进度 Image 的 fillAmount（未配置时忽略）。
+        /// </summary>
+        private void setPressFill(float amount)
+        {
+            if (_pressProgressImage != null)
+            {
+                _pressProgressImage.fillAmount = amount;
+            }
         }
 
         // ==================== HUD ====================
 
         /// <summary>
-        /// 更新两个 TextMeshProUGUI：方向指示（向下/向上）与状态指示（激活层 + 显示层 round(t)）。
+        /// 更新两个 TextMeshProUGUI：方向指示（向下/向上）与状态指示（激活层 + 0 层缩放百分比）。
         /// </summary>
         private void updateHud()
         {
@@ -230,54 +292,50 @@ namespace MapTest
             {
                 _directionText.text = _lastMoveDown ? "向下" : "向上";
             }
-            if (_statusText != null && _generator != null)
+            if (_statusText != null && _generator != null && _generator.Config != null)
             {
-                int shown = Mathf.RoundToInt(_generator.BrowseT);
-                _statusText.text = $"激活:{_generator.ActiveLayerIndex}  显示:{shown}";
+                float layer0Scale = Mathf.Pow(_generator.Config.ScaleRatio, -_generator.ScaleOffset);
+                int percent = Mathf.RoundToInt(PERCENT_MULTIPLIER * layer0Scale);
+                _statusText.text = $"激活:{_generator.ActiveLayerIndex}  缩放:{percent}%";
             }
-        }
-
-        // ==================== 根节点缩放 Tween ====================
-
-        /// <summary>
-        /// 按 progressScaleCurve 对根节点 scale 做 Tween（放大/缩小），打断上一次 Tween。
-        /// </summary>
-        private void playScaleTween(float intensity)
-        {
-            if (_rootTransform == null || _progressScaleCurve == null || _progressScaleCurve.length == 0)
-            {
-                return;
-            }
-            if (_scaleTween != null)
-            {
-                StopCoroutine(_scaleTween);
-            }
-            _scaleTween = StartCoroutine(scaleTweenRoutine(intensity));
-        }
-
-        /// <summary>
-        /// 根节点缩放 Tween 协程：baseScale * (1 + (curve - 1) * intensity)，结束恢复基准。
-        /// </summary>
-        private IEnumerator scaleTweenRoutine(float intensity)
-        {
-            Vector3 baseScale = _rootTransform.localScale;
-            float t = 0f;
-            while (t < 1f)
-            {
-                t += Time.deltaTime / SCALE_TWEEN_DURATION;
-                float curveValue = _progressScaleCurve.Evaluate(Mathf.Clamp01(t));
-                float factor = 1f + (curveValue - 1f) * intensity;
-                _rootTransform.localScale = baseScale * factor;
-                yield return null;
-            }
-            _rootTransform.localScale = baseScale;
-            _scaleTween = null;
         }
 
         // ==================== 私有方法 ====================
 
         /// <summary>
-        /// 从生成器配置读取 scrollSpeed 与根节点缩放曲线（配置为唯一数据源，运行期覆盖 Inspector 内联值）。
+        /// 订阅单个 InputActionProperty 的按下（performed）/松开（canceled）事件并启用动作（兼容内联动作与资产引用两种模式）。
+        /// </summary>
+        private void bindAction(InputActionProperty property, Action<InputAction.CallbackContext> onPressed, Action<InputAction.CallbackContext> onReleased)
+        {
+            InputAction action = property.action;
+            if (action == null)
+            {
+                XLogger.LogError("RingMapInteraction", "bindAction: 未配置输入动作，请在 Inspector 中绑定按键");
+                return;
+            }
+            action.performed += onPressed;
+            action.canceled += onReleased;
+            action.Enable();
+        }
+
+        /// <summary>
+        /// 取消订阅并禁用输入动作（与 bindAction 成对，防止残留）。
+        /// </summary>
+        private void unbindAction(InputActionProperty property, Action<InputAction.CallbackContext> onPressed, Action<InputAction.CallbackContext> onReleased)
+        {
+            InputAction action = property.action;
+            if (action == null)
+            {
+                return;
+            }
+            action.performed -= onPressed;
+            action.canceled -= onReleased;
+            action.Disable();
+        }
+
+        /// <summary>
+        /// 从生成器配置读取滚轮缩放步长 WheelStep 与每格分数单位 TicksPerLevel，
+        /// 计算每格拨动的 offset 增量 = WheelStep / TicksPerLevel（配置为唯一数据源，运行期覆盖 Inspector 内联值）。
         /// </summary>
         private void loadFromConfig()
         {
@@ -285,8 +343,8 @@ namespace MapTest
             {
                 return;
             }
-            _scrollSpeed = _generator.Config.ScrollSpeed;
-            _progressScaleCurve = _generator.Config.ProgressScaleCurve;
+            int ticksPerLevel = Mathf.Max(1, _generator.Config.WheelTicksPerLevel);
+            _scrollSpeed = _generator.Config.WheelStep / ticksPerLevel;
         }
     }
 }

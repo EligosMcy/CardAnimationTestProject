@@ -50,6 +50,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9fc1cdcaca20c2740ba4d63ea6f6bc1e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _config: {fileID: 11400000, guid: a82db682151812147b1926b2d7afb2a1, type: 2}
   _layout: {fileID: 1295018822422671438}
   _isActive: 0
   _layerSize: 1
@@ -70,15 +71,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _config: {fileID: 11400000, guid: a82db682151812147b1926b2d7afb2a1, type: 2}
-  _cellPrefab: {fileID: 5132046362498842754, guid: 3be30f286588f9a43bcd80f377fa5f7e, type: 3}
-  _radius: 200
-  _count: 8
-  _cellWidth: 100
-  _cellHeight: 100
-  _startAngleOffset: 0
-  _isClockwise: 1
-  _maxSlots: 8
-  _startSlot: 0
 --- !u!225 &5207376542616185062
 CanvasGroup:
   m_ObjectHideFlags: 0

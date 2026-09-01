@@ -8,12 +8,20 @@ namespace MapTest
 {
     /// <summary>
     /// 多层环形地图整图控制器：从 <see cref="RingMapConfigSO"/> 实例化各 <see cref="RingLayer"/> 预制体
-    /// （不直接创建 cell），维护激活层 activeLayerIndex 与连续浏览焦点 browseT，订阅
+    /// （不直接创建 cell），维护激活层 activeLayerIndex 与缩放步进 offset（复用 _browseT 字段），订阅
     /// <see cref="RingMapEvents.OnCellClicked"/> 作为 cell 点击统一处理入口，并向各层广播视觉刷新。
     /// </summary>
     [RequireComponent(typeof(RectTransform))]
     public class RingMapGenerator : MonoBehaviour
     {
+        // ==================== 常量 ====================
+
+        /// <summary>整圆角度（度）。</summary>
+        private const float FULL_CIRCLE_ANGLE = 360f;
+
+        /// <summary>完全错开基准系数：半格 cell 角度（0.5 表示 cellAngle / 2）。</summary>
+        private const float HALF_CELL_RATIO = 0.5f;
+
         // ==================== 字段 ====================
 
         /// <summary>
@@ -23,19 +31,21 @@ namespace MapTest
         [SerializeField] private RingMapConfigSO _config;
 
         /// <summary>
-        /// RingLayer 预制体（内含 UiRingLayout、cell 预制体与双态贴图引用），生成器只实例化不拼装 cell。
-        /// </summary>
-        [SerializeField] private GameObject _layerPrefab;
-
-        /// <summary>
         /// 生成的各层组件。
         /// </summary>
         [SerializeField] private List<RingLayer> _layers = new List<RingLayer>();
 
         /// <summary>
-        /// 连续浏览焦点（视觉深度），取值范围 [activeLayerIndex, 末层]，由滚轮改变，不改激活层。
+        /// 缩放步进显示值 offset（复用原浏览焦点字段）：层 i 缩放 = ratio^(i - offset)，offset ∈ [0, maxScaleOffset]，
+        /// 每帧以 WheelTweenSpeed 向目标值 _browseTarget 平滑渐变，驱动全体层等比缩放，不改激活层。
         /// </summary>
         [SerializeField] private float _browseT;
+
+        /// <summary>
+        /// 缩放步进目标值 offset：由滚轮（每格增量 = WheelStep / TicksPerLevel）或左右键（±1 层）修改，
+        /// 显示值 _browseT 在 Update 中向其渐变。
+        /// </summary>
+        [SerializeField] private float _browseTarget;
 
         /// <summary>
         /// 已提交激活层 index，Enable 贴图绑定此值。
@@ -50,7 +60,7 @@ namespace MapTest
         // ==================== 事件 ====================
 
         /// <summary>
-        /// 激活层推进事件（参数为方向 ±1），供交互层触发根节点 progressScale Tween。
+        /// 激活层推进事件（参数为方向 ±1），供交互层刷新 HUD。
         /// </summary>
         public event Action<int> LayerAdvanced;
 
@@ -59,8 +69,8 @@ namespace MapTest
         /// <summary>多层地图配置（只读）。</summary>
         public RingMapConfigSO Config => _config;
 
-        /// <summary>连续浏览焦点（只读）。</summary>
-        public float BrowseT => _browseT;
+        /// <summary>缩放步进显示值 offset（只读，随目标值平滑渐变），层 i 缩放 = ratio^(i - offset)。</summary>
+        public float ScaleOffset => _browseT;
 
         /// <summary>已提交激活层 index（只读）。</summary>
         public int ActiveLayerIndex => _activeLayerIndex;
@@ -92,7 +102,8 @@ namespace MapTest
         }
 
         /// <summary>
-        /// 每帧把浏览焦点与激活层广播给各层 SetVisual，刷新缩放/alpha/Enable 双态。
+        /// 每帧钳制目标值并把显示值 _browseT 以 WheelTweenSpeed 向目标渐变，
+        /// 再将缩放 offset 与激活层广播给各层 SetVisual，刷新等比缩放/alpha（恒 1）/Enable 双态。
         /// </summary>
         private void Update()
         {
@@ -100,11 +111,11 @@ namespace MapTest
             {
                 return;
             }
-            int lastIndex = _layers.Count - 1;
-            _browseT = Mathf.Clamp(_browseT, _activeLayerIndex, lastIndex);
+            _browseTarget = Mathf.Clamp(_browseTarget, 0f, _config.MaxScaleOffset);
+            _browseT = Mathf.MoveTowards(_browseT, _browseTarget, _config.WheelTweenSpeed * Time.deltaTime);
             for (int i = 0; i < _layers.Count; i++)
             {
-                _layers[i].SetVisual(_browseT, _activeLayerIndex, _config.LayerSizeCurve, _config.AlphaByDistanceCurve);
+                _layers[i].SetVisual(_browseT, _activeLayerIndex, _config.ScaleRatio);
             }
         }
 
@@ -119,8 +130,9 @@ namespace MapTest
         // ==================== 生成与状态 ====================
 
         /// <summary>
-        /// 按配置实例化各 RingLayer 预制体：把 count 注入其 UiRingLayout，错开在全局范围内随机，
-        /// 大小/方向取默认（baseScale 由 SetVisual 按 layerSizeCurve 自动计算），随后各层自行回填 cell 索引。
+        /// 按配置实例化各 RingLayer 预制体：把层 count 注入 RingLayer（其经 UiRingLayout 生成并布局 cell），
+        /// 起始角按链式规则计算（第一层区间随机，后续层以上一层最后一个 cell 为锚点错开半格并叠加浮动），
+        /// 大小/方向取默认（scale 由 SetVisual 按等比模型自动计算）。
         /// </summary>
         public void Generate()
         {
@@ -130,9 +142,9 @@ namespace MapTest
                 XLogger.LogError("RingMapGenerator", "Generate: _config 为空");
                 return;
             }
-            if (_layerPrefab == null)
+            if (_config.LayerPrefab == null)
             {
-                XLogger.LogError("RingMapGenerator", "Generate: _layerPrefab 为空");
+                XLogger.LogError("RingMapGenerator", "Generate: 配置未指定 RingLayer 预制体");
                 return;
             }
             int layerCount = _config.Layers.Count;
@@ -142,41 +154,36 @@ namespace MapTest
                 return;
             }
             int maxSlots = Mathf.Max(1, _config.MaxSlots);
-            Vector2 staggerRange = _config.MinMaxStagger;
+            float prevStagger = 0f;
+            int prevCount = 0;
             for (int i = 0; i < layerCount; i++)
             {
                 RingLayerConfig cfg = _config.Layers[i];
-                int count = Mathf.Clamp(cfg.Count, 0, maxSlots);
-                if (count != cfg.Count)
+                int count = cfg.Count;
+                // 链式起始角：第一层区间随机，后续层以上一层最后一个 cell 为锚点完全错开 + 浮动
+                float stagger = computeStagger(i, prevStagger, prevCount);
+                prevStagger = stagger;
+                // 上一层实际渲染的 cell 数（RingLayer 会将 count 钳制到 [0, maxSlots]），作为锚点计算基准
+                prevCount = Mathf.Min(count, maxSlots);
+                RingLayer layer = instantiateLayer(i, count, stagger);
+                if (layer == null)
                 {
-                    XLogger.LogWarning("RingMapGenerator", $"Generate: 层 {i} count={cfg.Count} 越界，已钳制到 [0, {maxSlots}]");
-                }
-                // 层间错开：全局 [minStagger, maxStagger] 随机取，允许相邻层部分重叠
-                float stagger = UnityEngine.Random.Range(staggerRange.x, staggerRange.y);
-                GameObject layerGO = instantiateLayer(i, count, maxSlots, stagger);
-                if (layerGO == null)
-                {
-                    continue;
-                }
-                if (!layerGO.TryGetComponent<RingLayer>(out RingLayer layer))
-                {
-                    XLogger.LogError("RingMapGenerator", $"Generate: 层 {i} 缺少 RingLayer 组件，已跳过");
-                    Destroy(layerGO);
                     continue;
                 }
                 _layers.Add(layer);
             }
             _activeLayerIndex = 0;
             _browseT = 0f;
+            _browseTarget = 0f;
         }
 
         /// <summary>
         /// 推进激活层：dir=+1 进入下一层，dir=-1 退回上一层；两端无效。
-        /// 同时将浏览焦点钳到新 [activeLayerIndex, 末层]，并通过 <see cref="LayerAdvanced"/> 通知交互层。
+        /// 同时把缩放目标值向同方向移动 ±1 层（显示值平滑渐变到对应层），通过 <see cref="LayerAdvanced"/> 通知交互层。
         /// </summary>
         public void AdvanceLayer(int dir)
         {
-            if (_layers.Count == 0)
+            if (_layers.Count == 0 || _config == null)
             {
                 return;
             }
@@ -187,7 +194,7 @@ namespace MapTest
                 return;
             }
             _activeLayerIndex = newIndex;
-            _browseT = Mathf.Clamp(_browseT, _activeLayerIndex, lastIndex);
+            _browseTarget = Mathf.Clamp(_browseTarget + dir, 0f, _config.MaxScaleOffset);
             Action<int> handler = LayerAdvanced;
             if (handler != null)
             {
@@ -196,44 +203,63 @@ namespace MapTest
         }
 
         /// <summary>
-        /// 滚轮浏览：改变 browseT，钳制到 [activeLayerIndex, 末层] 由 Update 保证；不改激活层。
+        /// 滚轮缩放：delta &gt; 0 全体层等比放大一级（offset 目标前进），delta &lt; 0 缩小；
+        /// 仅修改目标值 _browseTarget，显示值 _browseT 在 Update 中平滑渐变；目标钳制到 [0, maxScaleOffset]，不改激活层。
         /// </summary>
-        public void BrowseBy(float delta)
+        public void ZoomBy(float delta)
         {
-            _browseT += delta;
+            if (_config == null)
+            {
+                return;
+            }
+            _browseTarget = Mathf.Clamp(_browseTarget + delta, 0f, _config.MaxScaleOffset);
         }
 
         // ==================== 私有方法 ====================
 
         /// <summary>
-        /// 实例化单层预制体并注入 count/槽位/错开参数，配置完成后激活（UiRingLayout 按新 count 同步 cell）。
+        /// 计算第 layerIndex 层的起始角：第一层在 FirstLayerStaggerRange 内随机（无上一层）；
+        /// 后续层以上一层最后一个 cell 角度 + 半格 cell 角度为完全错开基准，再叠加 ±StaggerJitterCells 个 cell 的随机浮动。
         /// </summary>
-        private GameObject instantiateLayer(int layerIndex, int count, int maxSlots, float stagger)
+        private float computeStagger(int layerIndex, float prevStagger, int prevCount)
         {
-            GameObject layerGO = Instantiate(_layerPrefab, transform);
-            layerGO.name = $"RingLayer_{layerIndex}";
-            layerGO.SetActive(false);
-            if (!layerGO.TryGetComponent<UiRingLayout>(out UiRingLayout layout))
+            if (layerIndex == 0)
+            {
+                Vector2 range = _config.FirstLayerStaggerRange;
+                return UnityEngine.Random.Range(range.x, range.y);
+            }
+            int maxSlots = Mathf.Max(1, _config.MaxSlots);
+            float angleStep = FULL_CIRCLE_ANGLE / maxSlots;
+            float dir = _config.IsClockwise ? 1f : -1f;
+            // 上一层最后一个 cell 的角度（含其起始角、方向与槽位偏移）
+            float prevLastAngle = prevStagger + dir * (prevCount - 1) * angleStep;
+            // 完全错开基准：在最后一个 cell 基础上再多转半格
+            float baseAngle = prevLastAngle + dir * angleStep * HALF_CELL_RATIO;
+            float jitter = UnityEngine.Random.Range(-_config.StaggerJitterCells, _config.StaggerJitterCells) * angleStep;
+            return baseAngle + jitter;
+        }
+
+        /// <summary>
+        /// 实例化单层 RingLayer（直接实例化组件，其 GameObject 一并生成）并注入层配置
+        /// （层 index/count/错开等），配置完成后激活（RingLayer 经 UiRingLayout 自行生成并布局 cell）。
+        /// </summary>
+        private RingLayer instantiateLayer(int layerIndex, int count, float stagger)
+        {
+            RingLayer layer = Instantiate(_config.LayerPrefab, transform);
+            layer.name = $"RingLayer_{layerIndex}";
+            layer.gameObject.SetActive(false);
+            // UiRingLayout 在 RingLayer 初始化前检查，缺失时销毁该层并跳过
+            if (layer.Layout == null)
             {
                 XLogger.LogError("RingMapGenerator", $"instantiateLayer: 层 {layerIndex} 预制体缺少 UiRingLayout");
-                Destroy(layerGO);
+                Destroy(layer.gameObject);
                 return null;
             }
-            layout.MaxSlots = maxSlots;
-            layout.Count = count;
-            layout.StartSlot = 0;
-            layout.StartAngleOffset = stagger;
-            layout.IsClockwise = true;
-            if (!layerGO.TryGetComponent<RingLayer>(out RingLayer layer))
-            {
-                XLogger.LogError("RingMapGenerator", $"instantiateLayer: 层 {layerIndex} 预制体缺少 RingLayer");
-                Destroy(layerGO);
-                return null;
-            }
-            // 大小/方向取默认：baseScale 由 SetVisual 按 layerSizeCurve 自动计算
-            layer.Init(layout, layerIndex, count, 1f, 1f, stagger);
-            layerGO.SetActive(true);
-            return layerGO;
+            // 大小取默认：scale 由 SetVisual 按等比模型自动计算；方向与满环槽位来自 RingMapConfigSO
+            float layerDirection = _config.IsClockwise ? 1f : -1f;
+            layer.Init(layerIndex, count, 1f, layerDirection, stagger, _config.MaxSlots);
+            layer.gameObject.SetActive(true);
+            return layer;
         }
 
         /// <summary>

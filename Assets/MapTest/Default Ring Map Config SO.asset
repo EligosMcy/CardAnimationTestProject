@@ -13,149 +13,22 @@ MonoBehaviour:
   m_Name: Default Ring Map Config SO
   m_EditorClassIdentifier: 
   _layers:
-  - _count: 3
-    _hasSizeOverride: 0
-    _sizeOverride: 0
-    _hasDirectionOverride: 0
-    _directionOverride: 0
-    _hasStaggerOverride: 0
-    _staggerOverride: 0
-  - _count: 7
-    _hasSizeOverride: 0
-    _sizeOverride: 0
-    _hasDirectionOverride: 0
-    _directionOverride: 0
-    _hasStaggerOverride: 0
-    _staggerOverride: 0
-  - _count: 8
-    _hasSizeOverride: 0
-    _sizeOverride: 0
-    _hasDirectionOverride: 0
-    _directionOverride: 0
-    _hasStaggerOverride: 0
-    _staggerOverride: 0
-  - _count: 4
-    _hasSizeOverride: 0
-    _sizeOverride: 0
-    _hasDirectionOverride: 0
-    _directionOverride: 0
-    _hasStaggerOverride: 0
-    _staggerOverride: 0
   - _count: 5
-    _hasSizeOverride: 0
-    _sizeOverride: 0
-    _hasDirectionOverride: 0
-    _directionOverride: 0
-    _hasStaggerOverride: 0
-    _staggerOverride: 0
+  - _count: 3
+  - _count: 7
+  - _count: 4
+  - _count: 6
+  - _count: 3
+  - _count: 4
+  - _count: 6
+  - _count: 5
+  _layerPrefab: {fileID: 7650961452790825092, guid: 7e2e2a6f8f56fb44a921876576b31e96, type: 3}
   _maxSlots: 8
-  _minMaxStagger: {x: 15, y: 30}
-  _layerSizeCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 7
-      value: 0.35
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  _alphaByDistanceCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 0.6
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 2
-      value: 0.35
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 3
-      value: 0.15
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 7
-      value: 0.05
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  _progressScaleCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 0.5
-      value: 1.08
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  _scrollSpeed: 0.5
+  _isClockwise: 1
+  _firstLayerStaggerRange: {x: 0, y: 360}
+  _staggerJitterCells: 0
+  _scaleRatio: 0.4
+  _maxScaleOffset: 100
+  _wheelStep: 1
+  _wheelTicksPerLevel: 5
+  _wheelTweenSpeed: 2

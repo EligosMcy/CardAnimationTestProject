@@ -12,9 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9aefdd5a56d20cf4b9795b6cb345cfb4, type: 3}
   m_Name: Default Ring Config SO
   m_EditorClassIdentifier: 
-  _radius: 300
-  _count: 8
-  _cellWidth: 300
-  _cellHeight: 300
+  _radius: 600
+  _maxSlots: 8
+  _cellWidth: 600
+  _cellHeight: 600
   _startAngleOffset: 0
   _isClockwise: 1
+  _cellPrefab: {fileID: 5132046362498842754, guid: 3be30f286588f9a43bcd80f377fa5f7e, type: 3}
