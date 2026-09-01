@@ -34,6 +34,25 @@
 - 每次修改只改动与当前需求直接相关的代码，不做无关重构
 - 新增代码块前后加空行，保持可读性
 
+### 推荐使用扩展方法
+
+- 当需要为 UnityEngine 或其他第三方类添加通用辅助功能时，优先使用扩展方法
+
+```csharp
+public static class TransformExtensions
+{
+    /// <summary>
+    /// 重置变换到初始状态
+    /// </summary>
+    public static void ResetTransformation(this Transform transform)
+    {
+        transform.localScale = Vector3.one;
+        transform.rotation = Quaternion.identity;
+        transform.position = Vector3.zero;
+    }
+}
+```
+
 ---
 
 ## 命名空间（Namespace）
@@ -159,6 +178,20 @@ public bool IsAlive => _currentHealth > 0;
 public enum GameFlowState { None, Map, Battle, Shop }
 ```
 
+### 布尔变量：is / has / can 前缀 + PascalCase
+
+```csharp
+// ❌ 错误
+public bool dead;
+private bool visible;
+
+// ✅ 正确
+public bool isDead;
+private bool isVisible;
+private bool hasShield;
+private bool canMove;
+```
+
 ---
 
 ## 方法规范
@@ -181,6 +214,19 @@ var result = GetComponent<EnemyView>();
 // ✅ 正确
 List<CardData> list = new List<CardData>();
 EnemyView enemyView = GetComponent<EnemyView>();
+```
+
+### 禁止布尔参数
+
+- 方法参数中出现 `bool` 时，应拆分为两个语义明确的方法
+
+```csharp
+// ❌ 错误
+public Vector3 GetTargetPosition(bool worldSpace) { }
+
+// ✅ 正确
+public Vector3 GetTargetPositionInWorldSpace() { }
+public Vector3 GetTargetPositionInLocalSpace() { }
 ```
 
 ### 禁止魔法数字
@@ -240,9 +286,66 @@ if (currentHealth < CRITICAL_HEALTH_THRESHOLD) { ... }
 private void handleBattleVictory() { }
 ```
 
+### 每个枚举必须有 XML 注释
+
+- 枚举类型本身需要 `<summary>` 注释说明用途
+- 每个枚举值都需要 `<summary>` 注释说明含义
+
+```csharp
+/// <summary>
+/// 游戏流程状态机，标识当前所处的核心流程阶段
+/// </summary>
+public enum GameFlowState
+{
+    /// <summary>未开始 / 初始状态</summary>
+    None,
+    /// <summary>地图探索阶段</summary>
+    Map,
+    /// <summary>战斗阶段</summary>
+    Battle,
+    /// <summary>商店阶段</summary>
+    Shop,
+}
+```
+
+### 成员变量和属性必须有 XML 注释
+
+- 公有属性（Public Property）需要 `<summary>` 注释说明用途和含义
+- `[SerializeField]` 私有字段需要 `<summary>` 注释说明用途，便于在 Inspector 中理解
+- 普通私有字段建议添加 `<summary>` 注释，说明其存在的目的
+
+```csharp
+/// <summary>
+/// 当前生命值，对外只读
+/// </summary>
+public int CurrentHealth { get; private set; }
+
+/// <summary>
+/// 最大生命值上限
+/// </summary>
+public int MaxHealth { get; private set; }
+
+/// <summary>
+/// 怪物配置的 ScriptableObject，在 Inspector 中赋值
+/// </summary>
+[SerializeField] private MonsterConfigSO _monsterConfig;
+
+/// <summary>
+/// 数据中心引用，在 Awake 中初始化
+/// </summary>
+private RunDataCenter _dataCenter;
+```
+
 ### 复杂逻辑必须写行内注释
 
 - 非自解释的算法、条件判断、位运算等必须注释意图
+- 常规注释必须单独成行，禁止无意义的行尾注释
+- 允许复杂逻辑使用行内注释说明意图
+
+### 禁止保留注释掉的代码和过时 TODO
+
+- 不要保留注释掉的代码，应直接删除
+- 不要保留永远不会完成的 TODO，应直接删除或转化为实际任务
 
 ### 代码分区：使用分隔注释
 
