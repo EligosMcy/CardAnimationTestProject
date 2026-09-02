@@ -109,6 +109,10 @@ namespace SpineTest
         private void _animationState_Event(TrackEntry trackEntry, Spine.Event e)
         {
             XLogger.LogInfo("Default", $"Event,{trackEntry},{e},触发了用户定义事件");
+            if (e.Data.Name == "AttackStart")
+            {
+                XLogger.LogInfo("Default","Event - AttackStart");
+            }
         }
 
         private void _animationState_Dispose(TrackEntry trackEntry)
