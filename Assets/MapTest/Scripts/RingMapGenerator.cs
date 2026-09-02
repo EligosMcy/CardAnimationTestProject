@@ -36,14 +36,14 @@ namespace MapTest
         [SerializeField] private List<RingLayer> _layers = new List<RingLayer>();
 
         /// <summary>
-        /// 缩放步进显示值 offset（复用原浏览焦点字段）：层 i 缩放 = ratio^(i - offset)，offset ∈ [0, maxScaleOffset]，
+        /// 缩放步进显示值 offset（复用原浏览焦点字段）：层 i 缩放 = ratio^(i - offset)，offset ∈ [activeLayerIndex, 末层]，
         /// 每帧以 WheelTweenSpeed 向目标值 _browseTarget 平滑渐变，驱动全体层等比缩放，不改激活层。
         /// </summary>
         [SerializeField] private float _browseT;
 
         /// <summary>
-        /// 缩放步进目标值 offset：由滚轮（每格增量 = WheelStep / TicksPerLevel）或左右键（±1 层）修改，
-        /// 显示值 _browseT 在 Update 中向其渐变。
+        /// 缩放步进目标值 offset：由滚轮修改（允许大于激活层、不能小于激活层），
+        /// 或长按 ↑/↓ 提交后吸附到激活层（scale(active) = 1 位置）；显示值 _browseT 在 Update 中向其渐变。
         /// </summary>
         [SerializeField] private float _browseTarget;
 
@@ -102,7 +102,7 @@ namespace MapTest
         }
 
         /// <summary>
-        /// 每帧钳制目标值并把显示值 _browseT 以 WheelTweenSpeed 向目标渐变，
+        /// 每帧把目标值钳制到 [激活层, 末层] 并把显示值 _browseT 以 WheelTweenSpeed 向目标渐变，
         /// 再将缩放 offset 与激活层广播给各层 SetVisual，刷新等比缩放/alpha（恒 1）/Enable 双态。
         /// </summary>
         private void Update()
@@ -111,7 +111,8 @@ namespace MapTest
             {
                 return;
             }
-            _browseTarget = Mathf.Clamp(_browseTarget, 0f, _config.MaxScaleOffset);
+            int lastIndex = _layers.Count - 1;
+            _browseTarget = Mathf.Clamp(_browseTarget, _activeLayerIndex, lastIndex);
             _browseT = Mathf.MoveTowards(_browseT, _browseTarget, _config.WheelTweenSpeed * Time.deltaTime);
             for (int i = 0; i < _layers.Count; i++)
             {
@@ -179,7 +180,7 @@ namespace MapTest
 
         /// <summary>
         /// 推进激活层：dir=+1 进入下一层，dir=-1 退回上一层；两端无效。
-        /// 同时把缩放目标值向同方向移动 ±1 层（显示值平滑渐变到对应层），通过 <see cref="LayerAdvanced"/> 通知交互层。
+        /// 提交后浏览目标吸附到新激活层（scale(active) = 1 的位置），通过 <see cref="LayerAdvanced"/> 通知交互层。
         /// </summary>
         public void AdvanceLayer(int dir)
         {
@@ -194,7 +195,7 @@ namespace MapTest
                 return;
             }
             _activeLayerIndex = newIndex;
-            _browseTarget = Mathf.Clamp(_browseTarget + dir, 0f, _config.MaxScaleOffset);
+            _browseTarget = _activeLayerIndex;
             Action<int> handler = LayerAdvanced;
             if (handler != null)
             {
@@ -204,15 +205,17 @@ namespace MapTest
 
         /// <summary>
         /// 滚轮缩放：delta &gt; 0 全体层等比放大一级（offset 目标前进），delta &lt; 0 缩小；
-        /// 仅修改目标值 _browseTarget，显示值 _browseT 在 Update 中平滑渐变；目标钳制到 [0, maxScaleOffset]，不改激活层。
+        /// 仅修改目标值 _browseTarget，显示值 _browseT 在 Update 中平滑渐变；
+        /// 目标钳制到 [激活层, 末层]：允许大于激活层、不能小于激活层，不改激活层。
         /// </summary>
         public void ZoomBy(float delta)
         {
-            if (_config == null)
+            if (_layers.Count == 0 || _config == null)
             {
                 return;
             }
-            _browseTarget = Mathf.Clamp(_browseTarget + delta, 0f, _config.MaxScaleOffset);
+            int lastIndex = _layers.Count - 1;
+            _browseTarget = Mathf.Clamp(_browseTarget + delta, _activeLayerIndex, lastIndex);
         }
 
         // ==================== 私有方法 ====================

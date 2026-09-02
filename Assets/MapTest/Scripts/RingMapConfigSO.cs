@@ -87,7 +87,8 @@ namespace MapTest
         [SerializeField] private float _scaleRatio = 0.6f;
 
         /// <summary>
-        /// 缩放 offset 上限：offset ∈ [0, maxScaleOffset]，决定 0 层最大放大倍数 = ratio^(-maxScaleOffset)。
+        /// 已停用：缩放 offset 上限（保留字段兼容旧序列化数据）。
+        /// 浏览范围现由 RingMapGenerator 按 [激活层, 末层] 钳制，不再读取此值。
         /// </summary>
         [SerializeField] private float _maxScaleOffset = 4f;
 
@@ -129,7 +130,7 @@ namespace MapTest
         /// <summary>等比缩放比例。</summary>
         public float ScaleRatio => _scaleRatio;
 
-        /// <summary>缩放 offset 上限。</summary>
+        /// <summary>已停用：缩放 offset 上限（保留兼容，不再被引用）。</summary>
         public float MaxScaleOffset => _maxScaleOffset;
 
         /// <summary>每格滚轮推进的 offset 步长。</summary>

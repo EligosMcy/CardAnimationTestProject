@@ -22,13 +22,19 @@ MonoBehaviour:
   - _count: 4
   - _count: 6
   - _count: 5
+  - _count: 6
+  - _count: 3
+  - _count: 4
+  - _count: 7
+  - _count: 3
+  - _count: 2
   _layerPrefab: {fileID: 7650961452790825092, guid: 7e2e2a6f8f56fb44a921876576b31e96, type: 3}
   _maxSlots: 8
   _isClockwise: 1
   _firstLayerStaggerRange: {x: 0, y: 360}
-  _staggerJitterCells: 0
+  _staggerJitterCells: 2
   _scaleRatio: 0.4
   _maxScaleOffset: 100
   _wheelStep: 1
-  _wheelTicksPerLevel: 5
+  _wheelTicksPerLevel: 1
   _wheelTweenSpeed: 2
