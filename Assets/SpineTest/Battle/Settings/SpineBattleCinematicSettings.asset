@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e13ada6cd905824b877752a3fe72d54, type: 3}
+  m_Name: SpineBattleCinematicSettings
+  m_EditorClassIdentifier: 
+  AttackStartTime: 0.7
+  AttackFreezeFrame: 0.75
+  HitFrameTime: 0.3
+  PresentationDuration: 0.6
+  ReturnDuration: 0.15
+  FocusScaleMultiplier: 2
+  GroupScaleMultiplier: 1.1
+  CameraShakeAmplitude: 0.1
+  CameraShakeSpeed: 12
+  CameraShakeRotationAmplitude: 0
+  AttackClipName: Attack1
+  EnableDebugKeys: 1

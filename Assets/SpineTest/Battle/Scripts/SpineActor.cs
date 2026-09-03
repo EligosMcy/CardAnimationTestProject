@@ -37,7 +37,7 @@ namespace SpineTest.Battle
         private const float NORMAL_TIME_SCALE = 1f;
 
         /// <summary>
-        /// 零时间刻度,用于受击冻结
+        /// 零时间刻度,用于攻击/受击定格
         /// </summary>
         private const float FROZEN_TIME_SCALE = 0f;
 
@@ -157,6 +157,27 @@ namespace SpineTest.Battle
             entry.TrackTime = hitFrameTime;
             entry.TimeScale = FROZEN_TIME_SCALE;
             // 立即采样目标帧姿态,避免本帧闪现初始帧
+            _skeletonAnimation.Update(0f);
+        }
+
+        /// <summary>
+        /// 将当前主轨道动画(不切换动画)跳转并定格在指定帧,用于攻击方跳帧定格
+        /// </summary>
+        public void JumpFreezeAt(float clipTime)
+        {
+            if (!tryInitState())
+            {
+                return;
+            }
+            TrackEntry entry = getCurrentTrackEntry();
+            if (entry == null)
+            {
+                XLogger.LogWarning(LOG_TAG, "JumpFreezeAt: 主轨道无当前动画,忽略");
+                return;
+            }
+            entry.TrackTime = clipTime;
+            entry.TimeScale = FROZEN_TIME_SCALE;
+            // 立即采样目标帧姿态,避免本帧闪现上一帧姿态
             _skeletonAnimation.Update(0f);
         }
 
