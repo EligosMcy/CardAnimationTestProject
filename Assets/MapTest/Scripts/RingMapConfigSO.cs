@@ -87,12 +87,6 @@ namespace MapTest
         [SerializeField] private float _scaleRatio = 0.6f;
 
         /// <summary>
-        /// 已停用：缩放 offset 上限（保留字段兼容旧序列化数据）。
-        /// 浏览范围现由 RingMapGenerator 按 [激活层, 末层] 钳制，不再读取此值。
-        /// </summary>
-        [SerializeField] private float _maxScaleOffset = 4f;
-
-        /// <summary>
         /// 每格滚轮推进的 offset 步长（1 = 整层递进一级）。
         /// </summary>
         [SerializeField] private float _wheelStep = 1f;
@@ -129,9 +123,6 @@ namespace MapTest
 
         /// <summary>等比缩放比例。</summary>
         public float ScaleRatio => _scaleRatio;
-
-        /// <summary>已停用：缩放 offset 上限（保留兼容，不再被引用）。</summary>
-        public float MaxScaleOffset => _maxScaleOffset;
 
         /// <summary>每格滚轮推进的 offset 步长。</summary>
         public float WheelStep => _wheelStep;

@@ -2,7 +2,7 @@
 
 ## CodeGraph
 
-本仓库已由 CodeGraph 建立索引（存在 `.codegraph/` 目录，当前 780 文件 / 11,764 个符号节点）。需要**理解或定位代码**时，优先使用 CodeGraph，而不是先 grep/find 或逐文件 Read：
+本仓库已由 CodeGraph 建立索引（存在 `.codegraph/` 目录）。需要**理解或定位代码**时，优先使用 CodeGraph，而不是先 grep/find 或逐文件 Read：
 
 - **MCP 工具**：`codegraph_explore`（本项目 Trae 中的 MCP 服务器名为 `mcp_codegraph`，暴露单一工具 `codegraph_explore`）一次调用即可返回相关符号的原文、带行号源码与调用路径——包括 grep 无法追踪的动态分发跳转（回调、事件、多态分发）。在查询中直接给出文件或符号名即可读取其当前源码。若工具被列为延迟加载，通过工具搜索按名加载。
 - **Shell 兜底**：`codegraph explore "<符号名或问题>"` 输出与 MCP 工具完全一致；`codegraph node <符号>` 查看单个符号的源码与调用链。

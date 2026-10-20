@@ -34,7 +34,6 @@ MonoBehaviour:
   _firstLayerStaggerRange: {x: 0, y: 360}
   _staggerJitterCells: 2
   _scaleRatio: 0.4
-  _maxScaleOffset: 100
   _wheelStep: 1
   _wheelTicksPerLevel: 1
   _wheelTweenSpeed: 2
