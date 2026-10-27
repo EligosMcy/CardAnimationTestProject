@@ -106,3 +106,8 @@ InitTestScene*.unity*
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 Releases/
+
+# DD2 资源提取产物（体积过大，不纳入版本控制）
+/DD2Rip/
+/Assets/DD2Rip/
+/Assets/DD2Rip.meta
